@@ -1,0 +1,69 @@
+// Import required classes
+import com.eviware.soapui.support.*
+import com.eviware.soapui.impl.wsdl.teststeps.WsdlTestRequestStep
+import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
+
+// Try-catch block to handle exceptions
+try {
+    // 1. Get current date and timestamp values
+    def date = new Date()
+    def dts = date.format("yyyy-MM-dd-HH-mm-ss-ms")
+    def dt = date.format("yyyy-MM-dd")
+
+    // 2. Create Parent Directory
+    def parentDir = new File("C:\\" + dt)
+    if (!parentDir.exists()) {
+        parentDir.mkdirs()
+    }
+
+    // 3. Create Sub Directory inside Parent Directory
+    def testSuite = testRunner.testCase.testSuite.name
+    def testCase = testRunner.testCase.name
+    def subDir = new File("C:\\" + dt + "\\" + testSuite)
+    if (!subDir.exists()) {
+        subDir.mkdirs()
+    }
+
+    // 4. Create a Report file inside Sub Directory
+    def report = new File("C:\\" + dt + "\\" + testSuite + "\\" + "ExecutionReport" + ".csv")
+    if (!report.exists()) {
+        report.createNewFile()
+        report.write('"Test Suite Name","Test Case ID","Test Step Name","Assertion Name","Step Status","Error Message","Execution Date"')
+    }
+
+    // 5. Insert data into the Report file
+    testRunner.testCase.testStepList.each { testStep ->
+        // Extract common information for each test step
+        def testStepName = testStep.name
+        def testSteps = testRunner.testCase.getTestStepByName(testStepName)
+        
+        // Check if the test step is either a WSDL or REST test step
+        if (testSteps instanceof WsdlTestRequestStep || testSteps instanceof RestTestRequestStep) {
+            // Get the assertion list for the current test step
+            def list = testStep.getAssertionList()
+            
+            // Iterate through assertions and write data to the report file
+            for (assertion in list) {
+                report.append('\n')
+                report.append('"' + testSuite + '",')
+                report.append('"' + testCase + '",')
+                report.append('"' + testStepName + '",')
+                report.append('"' + assertion.name + '",')
+                report.append('"' + assertion.status + '",')
+                report.append('"')
+
+                // Iterate through errors and append messages to the report
+                for (MresMessage in assertion.getErrors()) {
+                    report.append('Message:' + MresMessage + '\n')
+                }
+                report.append('",')
+                
+                // Write executionDate in the file
+                report.append('"' + dts + '",')
+            }
+        }
+    }
+} catch (exc) {
+    // Log any exceptions that may occur during execution
+    log.error("Exception happened: $exc")
+}

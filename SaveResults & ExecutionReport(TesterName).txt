@@ -1,0 +1,75 @@
+import com.eviware.soapui.support.*
+import com.eviware.soapui.impl.wsdl.teststeps.WsdlTestRequestStep
+import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.io.File
+ 
+try {
+    // Common variables
+    def testSuite = testRunner.testCase.testSuite
+    def testCase = testRunner.testCase
+    def date = new Date()
+    def dt = new SimpleDateFormat("yyyy-MM-dd").format(date)
+    def dts = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-ms").format(date)
+    def testSuiteName = testSuite.name
+    def testCaseName = testCase.name
+    def testerName = "abc"
+    // Conditionally set baseDir
+    // If testerName is provided, include it in the directory structure, otherwise, omit it
+    def baseDir = testerName ? "C:\\$dt\\$testerName\\$testSuiteName\\" : "C:\\$dt\\$testSuiteName\\"
+ 
+    // Create parent directories if they don't exist
+    new File(baseDir).mkdirs()
+ 
+    // Create a Report file inside Sub Directory
+    def report = new File("$baseDir\\ExecutionReport.csv")
+    if (!report.exists()) {
+        // Create the header line in the report file
+        report.createNewFile()
+        report.append('"Test Suite Name","Test Case ID","Test Step Name","Assertion Name","Step Status","Error Message","Execution Date"\n')
+    }
+ 
+    // Process each test step
+    testRunner.testCase.testStepList.each { testStep ->
+ 
+        // Extract common information
+        def testStepName = testStep.name
+        def requestContent = context.expand('${' + testStepName + '#Request}')
+        def responseContent = context.expand('${' + testStepName + '#Response}')
+        
+        // Determine the test step type
+        // Handle only WsdlTestRequestStep or RestTestRequestStep types
+        if (testStep instanceof WsdlTestRequestStep || testStep instanceof RestTestRequestStep) {
+            log.info("Handling Test Step: $testStepName")
+ 
+            // Construct file paths for request and response
+            def requestFile = new File("$baseDir\\${testCaseName}_${testStepName}_Request.xml")
+            def responseFile = new File("$baseDir\\${testCaseName}_${testStepName}_Response.xml")
+ 
+            // Write request and response content to files
+            requestFile.write(requestContent, "UTF-8")
+            responseFile.write(responseContent, "UTF-8")
+ 
+            // Insert data into the Report file
+            def testSteps = testRunner.testCase.getTestStepByName(testStepName)
+            if (testStep instanceof WsdlTestRequestStep || testStep instanceof RestTestRequestStep) {
+                // Get the assertion list for the current test step
+                def list = testStep.getAssertionList()
+
+ 			
+                // Iterate through assertions and write data to the report file
+                for (assertion in list) {
+                	
+                    // Concatenate data and append to the report file
+                    report.append('"' + [testSuiteName, testCaseName, testStepName, assertion.name, assertion.status, ''].join('","') +
+                            assertion.getErrors().collect { 'Message:' + it }.join('\n') + '","' + dts + '"')
+                    report.append('\n')
+                }
+            }
+        }
+    }
+} catch (exc) {
+    // Log any exceptions that may occur during execution
+    log.error("Exception happened: $exc")
+}
